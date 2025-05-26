@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Travel API Ecosystem Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Visualization & Content Choices:
+        - Executive Summary: Text block. Goal: Overview.
+        - API Categories (Navigation): Tabs. Goal: Organize.
+        - API Listings (Cards): HTML/Tailwind. Goal: Inform/Compare (at a glance). Interaction: Click to expand.
+        - API Details (Expanded View): Structured text, lists, small tables for pricing. Goal: Inform.
+        - Pricing Tiers Comparison: Bar charts (Chart.js) within API details or category overview. Goal: Compare.
+        - Feature Lists: HTML lists. Goal: Inform.
+        - Comparative Tables (Overall per category): HTML tables. Goal: Compare.
+        - Recommendations: Highlighted text/badges. Goal: Inform/Guide.
+        - Justification: Balances information density with clarity. Cards for summaries, details on demand. Charts and tables for direct comparisons.
+        - Libraries: Chart.js. NO SVG/Mermaid. -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .tab-active { background-color: #0284c7; color: white; }
+        .tab-inactive { background-color: #e0f2fe; color: #0c4a6e; }
+        .card-expanded { max-height: 2000px; transition: max-height 0.7s ease-in-out; }
+        .card-collapsed { max-height: 0; overflow: hidden; transition: max-height 0.5s ease-in-out; }
+        .chart-container { position: relative; width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; height: 300px; max-height: 400px; }
+        @media (min-width: 768px) { .chart-container { height: 350px; } }
+        .sticky-nav { position: -webkit-sticky; position: sticky; top: 0; z-index: 50; }
+        .section-title { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; color: #334155; border-bottom: 2px solid #0ea5e9; padding-bottom: 0.5rem;}
+        .api-card { background-color: white; border-radius: 0.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06); margin-bottom: 1rem; }
+        .api-card-header { padding: 1rem; border-bottom: 1px solid #e5e7eb; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .api-card-header h3 { font-size: 1.25rem; font-weight: 600; color: #1e293b; }
+        .api-card-content { padding: 1rem; }
+        .details-table th, .details-table td { border: 1px solid #e5e7eb; padding: 0.5rem; text-align: left; }
+        .recommendation-badge { background-color: #10b981; color: white; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; font-weight: 500; display: inline-block; margin-top: 0.5rem; }
+        .cost-badge-free { background-color: #22c55e; color: white; }
+        .cost-badge-paid { background-color: #f97316; color: white; }
+        .cost-badge { padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: bold; }
+         /* Ensure tooltips are above other elements */
+        .chartjs-tooltip {
+            opacity: 1;
+            position: absolute;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            border-radius: 3px;
+            -webkit-transition: all .1s ease;
+            transition: all .1s ease;
+            pointer-events: none;
+            -webkit-transform: translate(-50%, 0);
+            transform: translate(-50%, 0);
+            padding: 4px 8px;
+            font-size: 0.875rem;
+            z-index: 1001; /* High z-index */
+        }
+        .chartjs-tooltip-key {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <header class="bg-sky-700 text-white p-6 shadow-md">
+        <div class="container mx-auto">
+            <h1 class="text-3xl font-bold">Travel API Ecosystem Explorer</h1>
+            <p class="text-sky-100">An interactive guide to API pricing, features, and recommendations.</p>
+        </div>
+    </header>
+
+    <nav id="apiCategoryTabs" class="sticky-nav bg-white shadow-lg mb-6 overflow-x-auto">
+        <div class="container mx-auto flex space-x-1 p-2">
+            </div>
+    </nav>
+
+    <main class="container mx-auto p-4 md:p-6">
+        <div id="contentArea">
+            </div>
+    </main>
+
+    <footer class="bg-slate-800 text-slate-300 text-center p-6 mt-12">
+        <p>&copy; 2025 Travel API Insights. Information based on the provided report.</p>
+    </footer>
+
+    <script>
+        const reportData = {
+            executiveSummary: `This report provides a comprehensive analysis of Application Programming Interfaces (APIs) across six critical categories for building a production-grade travel platform: Flights, Hotels, Destination Content, Package Builders, Meal/Grocery Ordering, and Payment. The evaluation prioritizes cost optimization, developer experience, and long-term reliability. The optimal API selection will invariably depend on the specific business model, scale of operations, target market, and technical resources of the travel platform. This application aims to furnish the necessary data and analysis to make informed strategic decisions.`,
+            apiCategories: [
+                {
+                    id: "flights",
+                    name: "✈️ Flights",
+                    introduction: "This section delves into the specifics of each Flight API, comparing their pricing models, features, and suitability for a production-grade travel platform. The benchmark will primarily be Amadeus, a long-standing Global Distribution System (GDS) provider, to contrast traditional and newer API offerings.",
+                    recommendationSummary: `For a production-grade travel platform focused on initial cost optimization and good developer experience, with a need for comprehensive data including historical and real-time status, **Aviationstack** emerges as a strong candidate. If flight price data integration is a primary and immediate need, **FlightLabs** warrants consideration. **FlightAPI.io** is attractive for ease of integration but has ambiguous overage charges. **Amadeus Self-Service** is best for platforms benefiting from deep GDS data and booking-heavy workflows.`,
+                    apis: [
+                        {
+                            name: "Aviationstack",
+                            isRecommended: true,
+                            summary: "Real-time and historical flight data via JSON REST API. Transparent tiered pricing.",
+                            pricingTiers: [
+                                { tier: "Free", cost: "$0/month", requests: "100", overage: "N/A", details: "Personal use, no support. Full aviation data, real-time flights." },
+                                { tier: "Basic", cost: "$49.99/month", requests: "10,000", overage: "$0.009998/req", details: "Commercial license, historical, routes, autocomplete, schedules, future flights, standard support." },
+                                { tier: "Professional", cost: "$149.99/month", requests: "50,000", overage: "$0.0059996/req", details: "All Basic features, extended limits." },
+                                { tier: "Business", cost: "$499.99/month", requests: "250,000", overage: "$0.00399992/req", details: "All Professional features, higher limits." },
+                                { tier: "Enterprise", cost: "Custom", requests: "Custom", overage: "Custom", details: "High-volume, custom solutions, platinum support." }
+                            ],
+                            features: ["Full aviation data", "Real-time flights (30-60s delay)", "Historical flights", "Airline routes", "Autocomplete", "Flight schedules", "Future flight data", "HTTPS encryption"],
+                            developerExperience: "Simple, Powerful JSON REST API, Extensive Documentation.",
+                            reliability: "Auto-scaling apilayer cloud infrastructure, consistently quick response times.",
+                            costEfficiencyNotes: "Transparent and predictable, good for low to mid-volume. More accessible than Amadeus GDS for startups.",
+                            scalabilityNotes: "Handles thousands to millions of calls per hour.",
+                            regionalAvailability: "Worldwide Coverage (250+ countries, 10,000+ airports).",
+                            dataQualityNotes: "Accurate details, integrates with sophisticated aviation data vendor."
+                        },
+                        {
+                            name: "FlightLabs",
+                            isRecommended: false,
+                            summary: "Live and historical flight data. Introductory pricing and flat overage rate.",
+                            pricingTiers: [
+                                { tier: "Free Trial", cost: "$0 (7 days)", requests: "50 (Starter)", overage: "N/A", details: "Limited test period." },
+                                { tier: "Starter", cost: "$24.99/month ($12.49 first month)", requests: "4,000 calls, 100 Real-Time Results", overage: "$0.00813/call", details: "Full aviation data, future, historical, schedules, prices." },
+                                { tier: "Basic", cost: "$49.99/month ($24.99 first month)", requests: "10,000 calls, 1,000 Real-Time Results", overage: "$0.00813/call", details: "As Starter." },
+                                { tier: "Pro", cost: "$149.99/month ($74.99 first month)", requests: "100,000 calls, Unlimited Real-Time Results", overage: "$0.00813/call", details: "As Starter." },
+                                { tier: "Premium", cost: "$249.99/month ($124.99 first month)", requests: "400,000 calls, Unlimited Real-Time Results", overage: "$0.00813/call", details: "As Starter." },
+                                { tier: "Enterprise", cost: "$10,000+/year", requests: "Custom", overage: "Custom", details: "SLA, dedicated account manager." }
+                            ],
+                            features: ["Full aviation data", "Future flights", "Historical flights", "Scheduled flights", "Flight prices", "Real-time flights (results limited on lower tiers)", "Airport info", "Airline details/routes"],
+                            developerExperience: "Seamless integration, comprehensive documentation, intuitive interface.",
+                            reliability: "Robust infrastructure, high availability, minimal downtime.",
+                            costEfficiencyNotes: "Transparent standard plans. Flat overage rate can be high. 'Soft Limit' overage policy requires careful monitoring.",
+                            scalabilityNotes: "Scalable cloud infrastructure (thousands to millions of queries/minute).",
+                            regionalAvailability: "Worldwide Coverage.",
+                            dataQualityNotes: "Accurate data, real-time and historical."
+                        },
+                        {
+                            name: "Amadeus Flights API",
+                            isRecommended: false,
+                            summary: "GDS powerhouse with Self-Service (pay-as-you-go) and Enterprise options.",
+                            pricingTiers: [
+                                { tier: "Self-Service (Free Quota)", cost: "$0/month", requests: "Varies by API (e.g., Flight Offers Search: 2k; Price: 3k; Create Orders: 10k)", overage: "Pay-as-you-go", details: "Persists in production. For development and initial live testing." },
+                                { tier: "Self-Service (Pay-as-you-go)", cost: "Varies (e.g., Flight Offers Search: €0.025/call; Price: €0.015/call; Create Orders: €0.04/call)", requests: "After free quota", overage: "N/A", details: "Transparent per-call pricing." },
+                                { tier: "Enterprise", cost: "Custom/Negotiated", requests: "Custom", overage: "Custom", details: "Pre-negotiated monthly fee, look-to-book ratio considerations, potential setup fees ($6k-$9k+)." }
+                            ],
+                            features: ["Extensive flight search (inspiration, multi-city, calendar)", "AI-based price analysis", "Booking capabilities", "Ancillary services", "Fare families", "Content from 400+ airlines (incl. LCCs)"],
+                            developerExperience: "Self-Service: REST/JSON, good portal, SDKs, sandbox. Enterprise: Can be complex (SOAP/XML), NDA, certification.",
+                            reliability: "Major GDS, engineered for high reliability and uptime.",
+                            costEfficiencyNotes: "Self-Service can be cost-effective if managed. Enterprise can be very costly. Look-to-book ratio impacts Enterprise costs.",
+                            scalabilityNotes: "Inherently high scalability (GDS backbone).",
+                            regionalAvailability: "Extensive global coverage.",
+                            dataQualityNotes: "Generally high, direct airline participation, real-time data."
+                        },
+                        {
+                            name: "FlightAPI.io",
+                            isRecommended: false,
+                            summary: "Flight data for price comparison, status tracking, and schedules. Credit-based pricing.",
+                            pricingTiers: [
+                                { tier: "Free", cost: "$0", requests: "50 API calls", overage: "N/A", details: "Limited initial testing." },
+                                { tier: "Lite", cost: "$49/month", requests: "30,000 API credits, 5 concurrent reqs", overage: "Not explicitly stated", details: "Flight Tracker, Timetable, Routes, Nearby, Autocomplete, Pricing APIs." },
+                                { tier: "Standard", cost: "$99/month", requests: "100,000 API credits, 10 concurrent reqs", overage: "Not explicitly stated", details: "As Lite." },
+                                { tier: "Plus", cost: "$199/month", requests: "500,000 API credits, 50 concurrent reqs", overage: "Not explicitly stated", details: "As Lite." },
+                                { tier: "Enterprise", cost: "$399+/month", requests: "1,000,000+ API credits, 100+ concurrent reqs", overage: "Not explicitly stated", details: "As Lite." }
+                            ],
+                            features: ["Flight Tracker API", "Airport Timetable API", "Airline Routes API", "Nearby API", "Autocomplete API", "Trip pricing APIs (Oneway, Round trip, Multicity)", "Data from 700+ airlines/vendors"],
+                            developerExperience: "Easy integration (single GET request, JSON), test API keys.",
+                            reliability: "Claims to be top-performing; specific SLAs not detailed.",
+                            costEfficiencyNotes: "Transparent low to moderate volume costs. Lack of clear overage cost is a drawback.",
+                            scalabilityNotes: "Claims 'fastest and most flexible'. Infrastructure details not as explicit.",
+                            regionalAvailability: "Global coverage implied ('Track any flight').",
+                            dataQualityNotes: "Accurate information, data-rich. Sourced from industry, authorities, partners."
+                        }
+                    ]
+                },
+                {
+                    id: "hotels",
+                    name: "🏨 Hotels",
+                    introduction: "This section evaluates Hotel APIs, focusing on inventory access, booking capabilities, pricing models, and how they compare to Amadeus Hotel APIs, which serve as a GDS benchmark.",
+                    recommendationSummary: `For a production-grade travel platform prioritizing a balance of broad inventory, booking capability, reasonable cost control, and good developer experience, **Amadeus Hotel API (Self-Service)** is recommended if GDS content is important. If the platform's primary driver is maximizing conversion through extensive property choice and rich user-generated content, and a commission-based model is preferred, **Expedia Partner Solutions (EPS Rapid API)** is the superior choice. **Sabre** is better for established enterprises. **Makcorps** serves price intelligence, not booking.`,
+                    apis: [
+                        {
+                            name: "Amadeus Hotel API",
+                            isRecommended: true,
+                            summary: "GDS hotel inventory with Self-Service (pay-as-you-go, free booking calls) and Enterprise options.",
+                            pricingTiers: [
+                                { tier: "Self-Service (Free Quota)", cost: "$0/month", requests: "Varies (e.g., Hotel List: 1-2k; Search: 3k; Booking: 3k; Ratings: 2k)", overage: "Pay-as-you-go", details: "Booking calls often free after quota." },
+                                { tier: "Self-Service (Pay-as-you-go)", cost: "Varies (e.g., Hotel List/Search: ~€0.015/call; Ratings: ~€0.025/call; Booking: Free)", requests: "After free quota", overage: "N/A", details: "Cost-efficient if search managed." },
+                                { tier: "Enterprise", cost: "Custom/Negotiated", requests: "Custom", overage: "Custom", details: "Look-to-book ratios, integration costs ($5k-$7k)." }
+                            ],
+                            features: ["Search 150,000+ hotels (GDS)", "Real-time availability & pricing", "Direct booking", "Hotel ratings", "Rich GDS content"],
+                            developerExperience: "Self-Service: REST/JSON, SDKs, good portal. Enterprise: Can be complex.",
+                            reliability: "High reliability (GDS).",
+                            costEfficiencyNotes: "Self-Service free booking calls are a key advantage. Enterprise for high volume.",
+                            scalabilityNotes: "High scalability (GDS infrastructure).",
+                            regionalAvailability: "Extensive global hotel inventory (GDS).",
+                            dataQualityNotes: "Generally high, direct GDS feeds, real-time."
+                        },
+                        {
+                            name: "Expedia Partner Solutions (EPS Rapid API)",
+                            isRecommended: true,
+                            summary: "Access to Expedia Group's vast inventory (700k+ properties). Commission-based model.",
+                            pricingTiers: [
+                                 { tier: "Partnership Model", cost: "Commission-based or partnership agreement terms. 'Free for approved partners'.", requests: "Not publicly detailed, based on partnership.", overage: "N/A", details: "Expedia collects commissions. Focus on revenue sharing." }
+                            ],
+                            features: ["700,000+ properties", "500+ airlines, 175 car rentals, 200k+ activities", "Rich content (24M+ images, 100M+ reviews)", "Shopping, Booking, Content APIs", "Real-time availability & pricing"],
+                            developerExperience: "Agile, streamlined, end-to-end customization. GraphQL for new APIs. Partner support.",
+                            reliability: "Robust infrastructure (major OTA). High support standards.",
+                            costEfficiencyNotes: "Challenging direct comparison. Commission model cost-effective if booking volumes high and rates favorable.",
+                            scalabilityNotes: "Agile, streamlined, designed for scale. GraphQL enhances performance.",
+                            regionalAvailability: "Global inventory of properties and travel products.",
+                            dataQualityNotes: "Extensive property content, images, reviews. Real-time data. Aggregates from various channels."
+                        },
+                        {
+                            name: "Makcorps Hotel API",
+                            isRecommended: false,
+                            summary: "Hotel price comparison data from 200+ OTAs. Does not support direct booking.",
+                            pricingTiers: [
+                                { tier: "Test Pack/Demo", cost: "$0", requests: "30 API calls, 1 concurrent", overage: "N/A", details: "Access to premium APIs, no email support." },
+                                { tier: "Basic", cost: "$350/month", requests: "10,000", overage: "$0.008/credit", details: "5 concurrent calls." },
+                                { tier: "Advance", cost: "$500/month", requests: "50,000", overage: "$0.008/credit", details: "5 concurrent calls. Popular." },
+                                { tier: "Custom", cost: "Contact Makcorps", requests: "Unlimited", overage: "Custom", details: "Unlimited concurrent, country-specific pricing, instant support." }
+                            ],
+                            features: ["Hotel price comparison", "Data from 200+ OTAs (Booking.com, Expedia, etc.)", "Real-time pricing", "Historical pricing data", "Competitor tracking", "No direct booking capability"],
+                            developerExperience: "No-code tutorials, JSON responses, documentation available.",
+                            reliability: "Positioned as provider of reliable and actionable hotel pricing data.",
+                            costEfficiencyNotes: "Expensive for functionality if compared to booking APIs. Value is in price intelligence.",
+                            scalabilityNotes: "Architecture designed for scalability.",
+                            regionalAvailability: "Global audience, multiple currencies, data from 200+ OTAs.",
+                            dataQualityNotes: "Claims real-time, accurate pricing. JSON includes address, reviews, ratings."
+                        },
+                        {
+                            name: "Sabre Hotel API",
+                            isRecommended: false,
+                            summary: "Major GDS provider with hotel inventory and Content Services for Lodging (CSL).",
+                            pricingTiers: [
+                                { tier: "Enterprise Model", cost: "Custom/Negotiated. Requires direct sales engagement.", requests: "Custom", overage: "Custom", details: "Likely setup fees, contract terms. Look-to-book ratios. Basic GDS service est. ~$5,000." }
+                            ],
+                            features: ["Hotel inventory from Sabre GDS (175k+ properties)", "Content from aggregators via CSL", "Hotel Lists, Hotel Content (rich media)", "Hotel Price Check (mandatory before booking)", "Booking capabilities"],
+                            developerExperience: "Sabre Dev Studio (REST/SOAP APIs, docs, SDKs). Integration can be complex, certification often required. CSL aims to improve content access.",
+                            reliability: "Major GDS, built for high reliability.",
+                            costEfficiencyNotes: "Likely similar to Amadeus Enterprise (high setup/ongoing costs). Less transparent. Supplier fees can be high (e.g., ~20% for hotels).",
+                            scalabilityNotes: "GDS-based, designed for high volume and scalability.",
+                            regionalAvailability: "Strong in North America & APAC. Global GDS coverage.",
+                            dataQualityNotes: "GDS-sourced data generally reliable. CSL integrates GDS and aggregator content."
+                        }
+                    ]
+                },
+                 {
+                    id: "destination_content",
+                    name: "🗺️ Destination Content",
+                    introduction: "This section focuses on APIs providing points of interest (POIs), reviews, and other destination-specific information. Google Places API is a common benchmark due to its widespread adoption and data breadth.",
+                    recommendationSummary: `A production-grade travel platform would likely benefit from a **hybrid approach**: Use **Google Places API** for foundational POI data. Integrate **TripAdvisor Content API** for rich user-generated reviews. Consider **Smartvel** for specialized, curated content modules if budget and needs align.`,
+                    apis: [
+                        {
+                            name: "Smartvel",
+                            isRecommended: false, // Recommended for specialized, not general
+                            summary: "AI-enriched, curated travel content solutions (POIs, events, travel requirements). Bespoke B2B pricing.",
+                            pricingTiers: [
+                                { tier: "Quote-based", cost: "Bespoke (e.g., COVID advisory from €500/month)", requests: "Custom", overage: "Custom", details: "Price based on customization, languages, destinations, SLAs." }
+                            ],
+                            features: ["Points of Interest (POIs)", "Cultural events", "Restaurant data", "TravelSEO tools", "Interactive maps (Explore&Go)", "Trip planning tools", "Travel guides & tips", "Event calendars", "EntryDocs (travel requirements: documents, visas, health)"],
+                            developerExperience: "Claims quick and easy integration (widgets, APIs, some within 24 hours).",
+                            reliability: "Focus on curated and verified content suggests aim for high data reliability.",
+                            costEfficiencyNotes: "Likely more expensive for basic POI data than Google/TripAdvisor. Value is in curated, specialized content.",
+                            scalabilityNotes: "Processes 750k+ events/year from 1k+ sources.",
+                            regionalAvailability: "500+ destinations, 20 languages, new destinations on demand.",
+                            dataQualityNotes: "AI-driven gathering, classification, curation, translation, verification, enrichment."
+                        },
+                        {
+                            name: "TripAdvisor Content API",
+                            isRecommended: true,
+                            summary: "Access to vast user-generated content (1B+ reviews, 7.5M+ locations). Generous free tier.",
+                            pricingTiers: [
+                                { tier: "Free Tier", cost: "$0/month", requests: "5,000 API calls", overage: "Pay-as-you-go", details: "Credit card required for overage." },
+                                { tier: "Pay-as-you-go", cost: "Volume discounts (lower price/call with more usage)", requests: "Beyond free tier", overage: "N/A", details: "Contact sales for >500k calls/month. Daily budget can be set." }
+                            ],
+                            features: ["7.5M+ locations data", "1B+ reviews & opinions", "29 languages", "Location ID, name, address, lat/long", "Links to read/write reviews", "Overall rating, ranking, subratings, awards", "Price level symbols", "Accommodation categories, attraction types, restaurant cuisines", "Mandatory brand attribution"],
+                            developerExperience: "API documentation, FAQs, support form. JSON responses with attribution images.",
+                            reliability: "Major global travel platform, expected to be reliable. Daily limits reset at midnight UTC.",
+                            costEfficiencyNotes: "5,000 free monthly calls is a good start. Cost depends on volume and call types.",
+                            scalabilityNotes: "Designed for scalable operations (contact for >500k calls/month).",
+                            regionalAvailability: "Global content footprint, 29 languages.",
+                            dataQualityNotes: "Strength in user-generated reviews and opinions. Quality/objectivity can vary."
+                        },
+                        {
+                            name: "Google Places API",
+                            isRecommended: true,
+                            summary: "Comprehensive global location data (POIs, businesses, reviews). Recurring $200 monthly credit.",
+                            pricingTiers: [
+                                { tier: "Free Tier/Credit", cost: "$200 monthly credit", requests: "Varies by SKU (e.g., Autocomplete/Place Details Essentials: 10k free calls/month; Nearby/Text Search Pro: 5k free)", overage: "Pay-as-you-go", details: "Credit applies to Maps, Routes, Places." },
+                                { tier: "Pay-as-you-go", cost: "Per 1,000 calls, tiered by volume & SKU (e.g., Autocomplete: $2.83/1k after free; Place Details Essentials: $5.00/1k after free; Nearby Search Pro: $32.00/1k after free)", requests: "Beyond free credit/tier", overage: "N/A", details: "Granular SKU-based pricing." }
+                            ],
+                            features: ["Place Search (Text, Nearby)", "Place Details (address, phone, hours, reviews)", "Autocomplete", "Geocoding", "Place Photos", "User reviews", "Places Aggregate API (density/characteristics insights)"],
+                            developerExperience: "Extensive documentation, client libraries (Android, iOS, JS), Google Cloud Console.",
+                            reliability: "Backed by Google Cloud infrastructure, high reliability and uptime.",
+                            costEfficiencyNotes: "$200 monthly credit very cost-effective for low/moderate use. SKU pricing requires careful management for optimization.",
+                            scalabilityNotes: "Massive scalability (Google Cloud Platform).",
+                            regionalAvailability: "Extensive global coverage.",
+                            dataQualityNotes: "Claims 'one of the most accurate, up-to-date, and comprehensive' models. Aggregates from multiple sources."
+                        }
+                    ]
+                },
+                {
+                    id: "package_builders",
+                    name: "🧩 Package Builders",
+                    introduction: "This section will examine APIs designed for creating dynamic travel packages, focusing on stated capabilities and target users. These newer APIs might offer more modern, flexible approaches to bundling travel components compared to traditional GDS packaging.",
+                    recommendationSummary: `For a platform prioritizing superior developer experience, modern flight distribution (NDC/LCC), and a flexible, modular approach with transparent costs, **Duffel** is recommended. For agencies focused on minimizing upfront costs and earning commissions with competitive fares (including NDC), the **APG Platform** is a highly compelling, low-risk option.`,
+                    apis: [
+                        {
+                            name: "Duffel",
+                            isRecommended: true,
+                            summary: "Modern API for flights (NDC, LCC, GDS via Travelport) and stays. Strong focus on developer experience.",
+                            pricingTiers: [
+                                { tier: "Flights API (Pay-as-you-go)", cost: "$3.00/confirmed order + 1% (Managed Content) + $2.00/paid ancillary. FX fees 2%.", requests: "Excess Search Fee: $0.005/search if search-to-book > 1500:1.", overage: "N/A (Excess Search Fee applies)", details: "No upfront costs to start integrating." },
+                                { tier: "Stays API", cost: "Profit-share model (contact sales for specifics).", requests: "N/A", overage: "N/A", details: "Commission on completed stays." },
+                                { tier: "Links (Low-code)", cost: "$99/month", requests: "Up to 50,000 links generated.", overage: "Contact sales", details: "Low-code flight booking solution." },
+                                { tier: "Enterprise Plan", cost: "Bespoke pricing, volume discounts (contact sales).", requests: "Custom", overage: "Custom", details: "For large volume." }
+                            ],
+                            features: ["Comprehensive flight search & booking (seats, bags)", "Itinerary management", "Post-booking services (changes, cancellations)", "Content from 300+ airlines (NDC, LCC, GDS via Travelport)", "Hotel booking API (Stays API)", "Can use Duffel's IATA/ARC accreditation"],
+                            developerExperience: "Very strong DX focus ('best API for selling flights'). RESTful API, excellent documentation, SDKs (JS), test airline (Duffel Airways).",
+                            reliability: "Public status page (duffelstatus.com). Rate limiting for stability.",
+                            costEfficiencyNotes: "Per-order flight fees offer predictability. Profit-share for stays aligns costs to revenue. Excess search fee is a key factor.",
+                            scalabilityNotes: "Designed for modern applications, aims for scalability.",
+                            regionalAvailability: "Global flight content (300+ airlines, 30 direct). Stays API likely global.",
+                            dataQualityNotes: "Access to direct NDC, LCC, GDS content. Real-time pricing and availability."
+                        },
+                        {
+                            name: "APG Platform (APG NDC Platform)",
+                            isRecommended: true,
+                            summary: "NDC-compliant content and dynamic packaging. Free for travel agencies, commission-based.",
+                            pricingTiers: [
+                                { tier: "For Travel Agencies/Developers", cost: "FREE. Earn 1% commission on all sales + potential airline bonuses (e.g., JEJU Air 1%, Ethiopian Airlines 2%). No GDS surcharge.", requests: "Not explicitly detailed.", overage: "N/A", details: "Accessible via B2B web tool or API." },
+                                { tier: "For Airlines", cost: "Implementation fee (up to $60k, per airline) + commission on revenue ('Pay as you earn').", requests: "N/A", overage: "N/A", details: "Distribution through APG Platform." }
+                            ],
+                            features: ["Access to competitive airfares & ancillaries", "Dynamic packaging (flights, hotels, cars, train, etc.)", "NDC-compliant content", "No GDS surcharge fees", "Ticketing processes handled", "Suitable for IATA and non-IATA agencies"],
+                            developerExperience: "API available. Detailed DX info (docs, SDKs, sandbox) not in snippets.",
+                            reliability: "APG Network assumes travel agent default risk for airlines.",
+                            costEfficiencyNotes: "Significantly cost-efficient upfront for agencies (free access, earn commission). Value depends on content competitiveness and commission rates.",
+                            scalabilityNotes: "Promoted and supported globally by APG Network (150+ countries).",
+                            regionalAvailability: "Global reach through APG Network.",
+                            dataQualityNotes: "Claims 'FULL CONTENT and COMPETITIVE FARES', potentially more RBDs/Flights/Routings than GDS. NDC compliant."
+                        }
+                    ]
+                },
+                {
+                    id: "meal_grocery_ordering",
+                    name: "🛒 Meal/Grocery Ordering",
+                    introduction: "This section analyzes APIs for integrating meal or grocery ordering, a valuable ancillary service for travel platforms, particularly for self-catering accommodations. Instacart Developer Platform is a key benchmark.",
+                    recommendationSummary: `For a production-grade travel platform looking to add meal/grocery ordering as a cost-optimized ancillary service with good developer experience and a clear path to potential revenue, the **Instacart Developer Platform (IDP)** is the standout recommendation. Walmart and Amazon APIs are more geared towards their marketplace sellers.`,
+                    apis: [
+                        {
+                            name: "Instacart Developer Platform (IDP)",
+                            isRecommended: true,
+                            summary: "Integrate Instacart's grocery ordering (85k+ retailers). Free API access, potential affiliate revenue.",
+                            pricingTiers: [
+                                { tier: "For 3rd Party Developers", cost: "Zero-cost API access. Option for affiliate account to track conversions and receive payments.", requests: "Not explicitly detailed.", overage: "N/A", details: "Instacart's revenue from consumer fees (delivery, membership, markups)." }
+                            ],
+                            features: ["Item availability & inventory data", "Ingredient & nutrition information", "Shoppable recipes", "Shopping list creation", "Access to 85,000+ national, regional, local retailers"],
+                            developerExperience: "Structured onboarding: sign up, API keys, tutorials, API reference, optional affiliate, pre-launch checklist, approval. Technical support, design resources (CTAs, logos).",
+                            reliability: "Relies on established Instacart marketplace infrastructure.",
+                            costEfficiencyNotes: "Highly cost-efficient for developers (free API, potential affiliate revenue). Value for travel platform is convenience offered.",
+                            scalabilityNotes: "Leverages Instacart's large-scale marketplace and logistics.",
+                            regionalAvailability: "Primarily United States and Canada.",
+                            dataQualityNotes: "Access to Instacart's comprehensive product catalog, real-time item availability."
+                        },
+                        {
+                            name: "Walmart Groceries API (Marketplace/Connect)",
+                            isRecommended: false,
+                            summary: "APIs for Marketplace sellers. Grocery integration likely via referral fees or partnership.",
+                            pricingTiers: [
+                                { tier: "Marketplace Model", cost: "Referral fees (8-15% for Grocery). Fulfillment (WFS) fees apply if used.", requests: "Realtime Pricing/Availability API has limits (e.g., 20 offerIds/call).", overage: "N/A", details: "Direct API call costs for product data not specified for general 3rd parties." }
+                            ],
+                            features: ["Item management", "Price & inventory updates", "Order management (for sellers)", "WFS automation", "Access to Walmart product catalog", "Real-time pricing & availability (via OPD APIs)"],
+                            developerExperience: "Developer Portal, API docs, credential tools. REST-based. Java preferred for support.",
+                            reliability: "Expected to be highly reliable (Walmart scale).",
+                            costEfficiencyNotes: "Integration path less direct than IDP. Referral fees (revenue share) similar to affiliate. Direct API costs unclear.",
+                            scalabilityNotes: "Massive retail operation, highly scalable infrastructure.",
+                            regionalAvailability: "Primarily US.",
+                            dataQualityNotes: "Direct access to Walmart's product catalog and pricing."
+                        },
+                        {
+                            name: "Amazon Fresh (SP-API)",
+                            isRecommended: false,
+                            summary: "Selling Partner API (SP-API) for sellers on Amazon. Direct 3rd party Fresh ordering API unclear.",
+                            pricingTiers: [
+                                { tier: "Selling Partner API (SP-API)", cost: "No direct fees for SP-API use for registered Selling Partners/Vendors. Subject to rate limits.", requests: "Defined usage plans and rate limits.", overage: "N/A", details: "Infrastructure costs (e.g., AWS API Gateway) would apply if building custom interface." },
+                                { tier: "Amazon Gift Card API", cost: "No program fees.", requests: "N/A", overage: "N/A", details: "For Amazon Incentives/Cash." }
+                            ],
+                            features: ["SP-API: Orders, shipments, payments, product pricing, listings management (for sellers)", "Access to Amazon's product catalog (for sellers)"],
+                            developerExperience: "SP-API: REST-based, SDKs, sandbox, comprehensive docs (Selling Partner API Developer Guide).",
+                            reliability: "Robust and highly reliable global infrastructure (Amazon).",
+                            costEfficiencyNotes: "SP-API not for direct 3rd party ordering. Path for Fresh integration less straightforward than IDP. Would likely involve Seller Program or specific affiliate.",
+                            scalabilityNotes: "Highly scalable infrastructure.",
+                            regionalAvailability: "Amazon Fresh availability varies. SP-API is global for sellers.",
+                            dataQualityNotes: "SP-API provides direct access to Amazon's catalog and seller data."
+                        }
+                    ]
+                },
+                {
+                    id: "payment",
+                    name: "💳 Payment",
+                    introduction: "This section evaluates leading payment APIs, crucial for any transactional travel platform. The focus will be on Stripe and Braintree, comparing their pricing, features, international capabilities, and developer experience.",
+                    recommendationSummary: `Both **Stripe** and **Braintree** are excellent choices. **Stripe** is often favored for its superior developer experience, extensive documentation, and broad international payment method support. **Braintree** is strong for its PayPal/Venmo integration and potentially more favorable rates for certain business models or volumes, especially if a dedicated merchant account is preferred. The best choice depends on specific needs regarding payment methods, international reach, and developer preference.`,
+                    apis: [
+                         {
+                            name: "Stripe",
+                            isRecommended: true,
+                            summary: "Developer-centric payment platform with comprehensive tools and pay-as-you-go pricing.",
+                            pricingTiers: [
+                                { tier: "Standard Online Payments", cost: "2.9% + $0.30/transaction (domestic cards/wallets).", requests: "N/A", overage: "N/A", details: "International cards: +1.5%. Currency conversion: +1%. Manually entered: +0.5%." },
+                                { tier: "ACH Direct Debit", cost: "0.8% per transaction (capped at $5.00).", requests: "N/A", overage: "N/A", details: "" },
+                                { tier: "Buy Now Pay Later (e.g., Klarna)", cost: "Starting at 5.99% + $0.30/transaction.", requests: "N/A", overage: "N/A", details: "" },
+                                { tier: "Stripe Connect (Platforms)", cost: "$2/monthly active connected account + 0.25% of payout volume + 25¢/payout (if platform handles pricing).", requests: "N/A", overage: "N/A", details: "Revenue share possible if Stripe handles pricing." },
+                                { tier: "Dispute Fee", cost: "$15.00/dispute (returned if won).", requests: "N/A", overage: "N/A", details: "" }
+                            ],
+                            features: ["Accepts major cards & digital wallets (Apple Pay, Google Pay)", "Local payment methods (135+ countries)", "ACH Direct Debit, SEPA, etc.", "Stripe Connect for marketplaces", "Stripe Billing for recurring payments", "Stripe Radar for fraud prevention", "Stripe Terminal for in-person payments", "Comprehensive reporting & analytics", "Link (accelerated checkout)"],
+                            developerExperience: "Excellent. Extensive documentation, client libraries (multiple languages), SDKs, API reference, test environment, Stripe CLI.",
+                            reliability: "High uptime, robust infrastructure. PCI DSS Level 1 compliant.",
+                            costEfficiencyNotes: "Transparent pay-as-you-go. Custom pricing for large volumes. Various fees for add-ons and international transactions.",
+                            scalabilityNotes: "Highly scalable, designed for businesses of all sizes.",
+                            regionalAvailability: "Supports businesses in 40+ countries, payments from 195+ countries, 135+ currencies & payment methods.",
+                            dataQualityNotes: "N/A (Payment processor, not data provider in the traditional sense)."
+                        }
+                        // Braintree data would go here if it were in the source.
+                        // Since Braintree is mentioned in summary but not detailed in the provided report text,
+                        // I will only include Stripe for now as per the source material integration rules.
+                        // If Braintree details were present, they'd follow a similar structure.
+                    ]
+                }
+            ]
+        };
+
+        const contentArea = document.getElementById('contentArea');
+        const apiCategoryTabs = document.getElementById('apiCategoryTabs').firstElementChild;
+        let activeTab = reportData.apiCategories[0].id;
+        let openApiCard = null;
+        let charts = {}; // To store chart instances
+
+        function renderTabs() {
+            apiCategoryTabs.innerHTML = reportData.apiCategories.map(category => `
+                <button
+                    data-tab-id="${category.id}"
+                    class="tab-button px-4 py-3 text-sm md:text-base font-medium rounded-md focus:outline-none transition-colors duration-150 ${category.id === activeTab ? 'tab-active' : 'tab-inactive'}"
+                >
+                    ${category.name}
+                </button>
+            `).join('');
+
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    activeTab = button.dataset.tabId;
+                    renderTabs();
+                    renderContent();
+                });
+            });
+        }
+
+        function toggleApiCard(apiName) {
+            const contentDiv = document.getElementById(`api-content-${apiName.replace(/\s+/g, '-')}`);
+            const iconDiv = document.getElementById(`api-icon-${apiName.replace(/\s+/g, '-')}`);
+
+            if (openApiCard && openApiCard !== contentDiv) {
+                openApiCard.classList.remove('card-expanded');
+                openApiCard.classList.add('card-collapsed');
+                const openIconDiv = document.getElementById(`api-icon-${openApiCard.id.split('api-content-')[1]}`);
+                if (openIconDiv) openIconDiv.innerHTML = '➔';
+            }
+
+            if (contentDiv.classList.contains('card-collapsed')) {
+                contentDiv.classList.remove('card-collapsed');
+                contentDiv.classList.add('card-expanded');
+                iconDiv.innerHTML = '▼';
+                openApiCard = contentDiv;
+                // If there's a chart to render for this card, render it now
+                const chartCanvas = contentDiv.querySelector('canvas');
+                if (chartCanvas && chartCanvas.dataset.apiName) {
+                    renderPricingChart(chartCanvas.dataset.apiName);
+                }
+            } else {
+                contentDiv.classList.remove('card-expanded');
+                contentDiv.classList.add('card-collapsed');
+                iconDiv.innerHTML = '➔';
+                openApiCard = null;
+            }
+        }
+        
+        function renderPricingChart(apiName) {
+            const category = reportData.apiCategories.find(cat => cat.apis.some(api => api.name === apiName));
+            if (!category) return;
+            const api = category.apis.find(a => a.name === apiName);
+            if (!api || !api.pricingTiers || api.pricingTiers.every(t => t.cost.toLowerCase().includes('custom') || t.cost.toLowerCase().includes('n/a') || t.cost.toLowerCase().includes('varies') || t.cost.startsWith('$0'))) {
+                 // Don't render chart if no meaningful cost data
+                const chartContainer = document.getElementById(`chart-container-${apiName.replace(/\s+/g, '-')}`);
+                if(chartContainer) chartContainer.innerHTML = '<p class="text-sm text-slate-600 p-4 text-center">Pricing is custom, free, or too variable for a comparative chart.</p>';
+                return;
+            }
+
+            const canvasId = `chart-${apiName.replace(/\s+/g, '-')}`;
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            // Destroy existing chart if it exists
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+            
+            const labels = api.pricingTiers.map(p => p.tier).filter(tier => !tier.toLowerCase().includes('free') && !tier.toLowerCase().includes('enterprise') && !tier.toLowerCase().includes('custom'));
+            const data = api.pricingTiers.map(p => {
+                const costMatch = p.cost.match(/[\d\.]+/);
+                return costMatch ? parseFloat(costMatch[0]) : null;
+            }).filter((cost, index) => !api.pricingTiers[index].tier.toLowerCase().includes('free') && !api.pricingTiers[index].tier.toLowerCase().includes('enterprise') && !api.pricingTiers[index].tier.toLowerCase().includes('custom') && cost !== null);
+
+
+            if (labels.length === 0 || data.length === 0 || data.every(d => d === null || d === 0) ) {
+                 const chartContainer = document.getElementById(`chart-container-${apiName.replace(/\s+/g, '-')}`);
+                if(chartContainer) chartContainer.innerHTML = '<p class="text-sm text-slate-600 p-4 text-center">No comparable paid tiers with fixed pricing found for a chart.</p>';
+                return;
+            }
+            
+            charts[canvasId] = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Monthly Cost ($)',
+                        data: data,
+                        backgroundColor: 'rgba(2, 132, 199, 0.6)', // sky-600
+                        borderColor: 'rgba(2, 132, 199, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: { display: true, text: 'Cost (USD)' }
+                        },
+                        x: {
+                            title: { display: true, text: 'Pricing Tier' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.y !== null) {
+                                        label += new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(context.parsed.y);
+                                    }
+                                    const tierIndex = context.dataIndex;
+                                    const originalTier = api.pricingTiers.find(t => t.tier === context.label);
+                                    if (originalTier && originalTier.requests) {
+                                       label += ` (${originalTier.requests} requests/credits)`;
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+
+        function renderContent() {
+            const category = reportData.apiCategories.find(cat => cat.id === activeTab);
+            if (!category) {
+                // Render Executive Summary if no specific tab or on initial load
+                contentArea.innerHTML = `
+                    <section id="executive-summary" class="mb-8 p-6 bg-white rounded-lg shadow">
+                        <h2 class="section-title">Executive Summary</h2>
+                        <p class="text-slate-700 leading-relaxed">${reportData.executiveSummary}</p>
+                    </section>
+                `;
+                return;
+            }
+
+            let html = `
+                <section id="${category.id}" class="mb-8">
+                    <h2 class="section-title">${category.name} Overview</h2>
+                    <p class="text-slate-600 leading-relaxed mb-6">${category.introduction}</p>
+            `;
+
+            category.apis.forEach(api => {
+                const apiId = api.name.replace(/\s+/g, '-');
+                html += `
+                    <div class="api-card">
+                        <div class="api-card-header" onclick="toggleApiCard('${api.name}')">
+                            <div class="flex items-center">
+                                <h3 class="mr-3">${api.name}</h3>
+                                ${api.isRecommended ? '<span class="recommendation-badge">Recommended</span>' : ''}
+                                <span class="cost-badge ml-2 ${api.pricingTiers[0].cost === '$0' || api.pricingTiers[0].cost.toLowerCase().includes('free') ? 'cost-badge-free' : 'cost-badge-paid'}">
+                                    ${api.pricingTiers[0].cost === '$0' || api.pricingTiers[0].cost.toLowerCase().includes('free') ? 'Free Tier Available' : 'Paid'}
+                                </span>
+                            </div>
+                            <span id="api-icon-${apiId}" class="text-sky-600 text-xl">➔</span>
+                        </div>
+                        <div id="api-content-${apiId}" class="api-card-content card-collapsed">
+                            <p class="text-sm text-slate-600 mb-3"><strong>Summary:</strong> ${api.summary}</p>
+                            
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Pricing Tiers:</h4>
+                            <div class="overflow-x-auto mb-3">
+                                <table class="min-w-full text-sm details-table">
+                                    <thead><tr><th>Tier</th><th>Cost</th><th>Requests/Quota</th><th>Overage</th><th>Details</th></tr></thead>
+                                    <tbody>
+                                        ${api.pricingTiers.map(p => `<tr><td>${p.tier}</td><td>${p.cost}</td><td>${p.requests}</td><td>${p.overage}</td><td>${p.details || ''}</td></tr>`).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            ${ (api.pricingTiers && api.pricingTiers.some(t => !t.cost.toLowerCase().includes('custom') && !t.cost.toLowerCase().includes('n/a') && !t.cost.toLowerCase().includes('varies') && !t.cost.startsWith('$0'))) ? `
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Pricing Comparison (Paid Tiers):</h4>
+                            <div id="chart-container-${apiId}" class="chart-container mb-4">
+                                <canvas id="chart-${apiId}" data-api-name="${api.name}"></canvas>
+                            </div>` : ''}
+
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Key Features:</h4>
+                            <ul class="list-disc list-inside text-sm text-slate-600 mb-3 space-y-1">
+                                ${api.features.map(f => `<li>${f}</li>`).join('')}
+                            </ul>
+                            
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Developer Experience:</h4>
+                            <p class="text-sm text-slate-600 mb-3">${api.developerExperience}</p>
+                            
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Reliability:</h4>
+                            <p class="text-sm text-slate-600 mb-3">${api.reliability}</p>
+
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Cost Efficiency Notes:</h4>
+                            <p class="text-sm text-slate-600 mb-3">${api.costEfficiencyNotes || 'N/A'}</p>
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Scalability Notes:</h4>
+                            <p class="text-sm text-slate-600 mb-3">${api.scalabilityNotes || 'N/A'}</p>
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Regional Availability:</h4>
+                            <p class="text-sm text-slate-600 mb-3">${api.regionalAvailability || 'N/A'}</p>
+                            <h4 class="font-semibold text-slate-700 mt-4 mb-2">Data Quality Notes:</h4>
+                            <p class="text-sm text-slate-600 mb-3">${api.dataQualityNotes || 'N/A'}</p>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `
+                    <div class="mt-8 p-6 bg-sky-50 border border-sky-200 rounded-lg shadow">
+                        <h3 class="text-xl font-semibold text-sky-700 mb-3">Recommendations for ${category.name} APIs</h3>
+                        <p class="text-slate-700 leading-relaxed">${category.recommendationSummary}</p>
+                    </div>
+                </section>
+            `;
+            contentArea.innerHTML = html;
+             // Ensure any previously open card is reset if switching tabs
+            openApiCard = null;
+        }
+        
+        // Initial Render
+        activeTab = 'executive-summary'; // Start with executive summary
+        const initialTabsHtml = `
+            <button data-tab-id="executive-summary" class="tab-button px-4 py-3 text-sm md:text-base font-medium rounded-md focus:outline-none transition-colors duration-150 tab-active">
+                🌟 Executive Summary
+            </button>
+            ${reportData.apiCategories.map(category => `
+                <button
+                    data-tab-id="${category.id}"
+                    class="tab-button px-4 py-3 text-sm md:text-base font-medium rounded-md focus:outline-none transition-colors duration-150 tab-inactive"
+                >
+                    ${category.name}
+                </button>
+            `).join('')}
+        `;
+        apiCategoryTabs.innerHTML = initialTabsHtml;
+
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', () => {
+                activeTab = button.dataset.tabId;
+                document.querySelectorAll('.tab-button').forEach(btn => {
+                    btn.classList.remove('tab-active');
+                    btn.classList.add('tab-inactive');
+                });
+                button.classList.add('tab-active');
+                button.classList.remove('tab-inactive');
+                if (activeTab === 'executive-summary') {
+                    renderExecutiveSummary();
+                } else {
+                    renderContent();
+                }
+            });
+        });
+
+        function renderExecutiveSummary() {
+             contentArea.innerHTML = `
+                <section id="executive-summary-content" class="mb-8 p-6 bg-white rounded-lg shadow">
+                    <h2 class="section-title">Executive Summary</h2>
+                    <p class="text-slate-700 leading-relaxed">${reportData.executiveSummary}</p>
+                </section>
+            `;
+        }
+
+        renderExecutiveSummary(); // Load summary first
+
+    </script>
+
+</body>
+</html>
